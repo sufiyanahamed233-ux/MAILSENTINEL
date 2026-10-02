@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     THREAT_INTEL_TIMEOUT_SECONDS: int = 10
     THREAT_INTEL_CACHE_HOURS: int = 24
 
+    # Gemini AI Settings
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

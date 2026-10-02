@@ -8,6 +8,7 @@ or raw provider API responses.
 """
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -192,3 +193,81 @@ class AIAnalysisContext(BaseModel):
     case: AICaseContext
     forensic_evidence: AIForensicEvidence
     threat_intelligence: AIThreatIntelligence
+
+
+# ------------------------------------------------------------------
+# AI Threat Analysis Output Models
+# ------------------------------------------------------------------
+
+class AIThreatIndicator(BaseModel):
+    """Specific threat indicator identified during AI threat analysis."""
+
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+    indicator_type: str = Field(
+        ...,
+        description="Type of indicator (e.g. 'header', 'url', 'domain', 'ip', 'attachment', 'behavior').",
+    )
+    indicator_value: str = Field(
+        ...,
+        description="Observed forensic value or artefact matching the indicator.",
+    )
+    threat_type: str = Field(
+        default="unknown",
+        description="Classification of threat (e.g. 'phishing', 'spoofing', 'malware', 'credential_harvesting', 'anomaly').",
+    )
+    severity: Literal["low", "medium", "high", "critical"] = Field(
+        default="medium",
+        description="Assessed severity level of the indicator.",
+    )
+    description: str = Field(
+        ...,
+        description="Detailed explanation of the threat posed by this indicator.",
+    )
+
+
+class AIThreatAssessment(BaseModel):
+    """Structured threat-analysis assessment produced by an AI provider.
+
+    Adheres strictly to the schema required for downstream persistence
+    into the ``ai_analysis_results`` database table.
+    """
+
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+    classification: Literal["clean", "suspicious", "malicious", "unknown"] = Field(
+        ...,
+        description="Overall threat classification: clean, suspicious, malicious, or unknown.",
+    )
+    risk_score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Calculated overall risk score from 0 (benign) to 100 (critical danger).",
+    )
+    confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Confidence level in the assessment from 0.0 (no confidence) to 1.0 (certain).",
+    )
+    threat_indicators: list[AIThreatIndicator] = Field(
+        default_factory=list,
+        description="Detailed list of specific threat indicators detected in the evidence.",
+    )
+    supporting_evidence: list[str] = Field(
+        default_factory=list,
+        description="Key observed forensic evidence points directly supporting the classification.",
+    )
+    attack_techniques: list[str] = Field(
+        default_factory=list,
+        description="Identified attack techniques, vectors, or MITRE ATT&CK patterns.",
+    )
+    reasoning: str = Field(
+        ...,
+        description="Analytical rationale and justification explaining the assessment.",
+    )
+    recommended_actions: list[str] = Field(
+        default_factory=list,
+        description="Actionable remediation, containment, or follow-up recommendations for analysts.",
+    )
