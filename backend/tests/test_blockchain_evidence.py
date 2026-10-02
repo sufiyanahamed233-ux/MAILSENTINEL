@@ -689,3 +689,185 @@ def test_14_transaction_not_found_on_verification():
 
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
+
+
+# ===========================================================================
+# Phase 6E — Reliability & Idempotency Hardening Tests
+# ===========================================================================
+
+
+def test_15_transaction_confirmation_timeout():
+    """15. Transaction confirmation timeout rolls back DB and returns 502."""
+    with SessionLocal() as db:
+        case = _make_case(db)
+        ev = _make_evidence(db, case.id)
+        db.commit()
+
+        timeout_provider = MagicMock(spec=BlockchainProvider)
+        timeout_provider.anchor_evidence.side_effect = BlockchainNetworkError(
+            f"Failed waiting for transaction confirmation '{SAMPLE_TX_ID}': TimeExhausted: Timed out waiting for transaction receipt"
+        )
+
+        # Service level: raises BlockchainNetworkError and rolls back
+        with pytest.raises(BlockchainNetworkError) as exc_info:
+            anchor_evidence_to_blockchain(db, case.id, ev.id, provider=timeout_provider)
+        assert "Timed out waiting for transaction receipt" in str(exc_info.value)
+
+        db.refresh(ev)
+        assert ev.blockchain_tx_id is None
+        assert ev.blockchain_verified is False
+
+        # API level: returns 502 Bad Gateway
+        with patch("app.services.blockchain.evidence_service.get_blockchain_provider", return_value=timeout_provider):
+            resp = client.post(f"/api/v1/cases/{case.id}/evidence/{ev.id}/anchor")
+        assert resp.status_code == 502
+        assert "Timed out waiting for transaction receipt" in resp.json()["detail"]
+
+
+def test_16_transaction_receipt_revert():
+    """16. Transaction on-chain revert failure rolls back DB and returns 502."""
+    with SessionLocal() as db:
+        case = _make_case(db)
+        ev = _make_evidence(db, case.id)
+        db.commit()
+
+        revert_provider = MagicMock(spec=BlockchainProvider)
+        revert_provider.anchor_evidence.side_effect = BlockchainAnchorError(
+            f"Transaction {SAMPLE_TX_ID} reverted on-chain."
+        )
+
+        with pytest.raises(BlockchainAnchorError):
+            anchor_evidence_to_blockchain(db, case.id, ev.id, provider=revert_provider)
+
+        db.refresh(ev)
+        assert ev.blockchain_tx_id is None
+
+        with patch("app.services.blockchain.evidence_service.get_blockchain_provider", return_value=revert_provider):
+            resp = client.post(f"/api/v1/cases/{case.id}/evidence/{ev.id}/anchor")
+        assert resp.status_code == 502
+        assert "reverted on-chain" in resp.json()["detail"]
+
+
+def test_17_provider_response_after_broadcast_pending_confirmation():
+    """17. Provider response after broadcast with 0 confirmations returns status='pending' and saves tx_id."""
+    with SessionLocal() as db:
+        case = _make_case(db)
+        ev = _make_evidence(db, case.id)
+        db.commit()
+
+        pending_provider = _build_mock_provider(tx_id=SAMPLE_TX_ID)
+        # Override to pending status
+        def _anchor_pending(proof: CanonicalEvidenceProof) -> AnchorResult:
+            return AnchorResult(
+                transaction_id=SAMPLE_TX_ID,
+                proof_sha256=proof.proof_sha256,
+                network=SAMPLE_NETWORK,
+                provider=SAMPLE_PROVIDER,
+                anchored_at=datetime.now(timezone.utc),
+                status="pending",
+            )
+        pending_provider.anchor_evidence.side_effect = _anchor_pending
+
+        res = anchor_evidence_to_blockchain(db, case.id, ev.id, provider=pending_provider)
+        assert res.status == "pending"
+        assert res.transaction_id == SAMPLE_TX_ID
+        assert res.blockchain_verified is False
+
+        # In DB
+        db.refresh(ev)
+        assert ev.blockchain_tx_id == SAMPLE_TX_ID
+        assert ev.blockchain_verified is False
+
+
+def test_18_verification_after_confirmation_e2e():
+    """18. End-to-end anchor confirmation followed by verification succeeds and persists."""
+    with SessionLocal() as db:
+        case = _make_case(db)
+        ev = _make_evidence(db, case.id)
+        db.commit()
+
+        mock_provider = _build_mock_provider(tx_id=SAMPLE_TX_ID, verified=True, verify_status="verified")
+
+        # 1. Anchor
+        with patch("app.services.blockchain.evidence_service.get_blockchain_provider", return_value=mock_provider):
+            anchor_resp = client.post(f"/api/v1/cases/{case.id}/evidence/{ev.id}/anchor")
+        assert anchor_resp.status_code == 200
+        assert anchor_resp.json()["status"] == "confirmed"
+        assert anchor_resp.json()["blockchain_verified"] is False
+
+        # 2. Verify
+        with patch("app.services.blockchain.evidence_service.get_blockchain_provider", return_value=mock_provider):
+            verify_resp = client.post(f"/api/v1/cases/{case.id}/evidence/{ev.id}/verify")
+        assert verify_resp.status_code == 200
+        assert verify_resp.json()["status"] == "verified"
+        assert verify_resp.json()["blockchain_verified"] is True
+
+        db.refresh(ev)
+        assert ev.blockchain_verified is True
+
+
+def test_19_corrupted_malformed_calldata_verification():
+    """19. Corrupted/malformed on-chain transaction calldata sets verified=False, status='malformed_calldata'."""
+    with SessionLocal() as db:
+        case = _make_case(db)
+        ev = _make_evidence(db, case.id, blockchain_tx_id=SAMPLE_TX_ID, blockchain_verified=True)
+        db.commit()
+
+        malformed_provider = _build_mock_provider(
+            tx_id=SAMPLE_TX_ID,
+            verified=False,
+            verify_status="malformed_calldata",
+        )
+
+        res = verify_evidence_on_blockchain(db, case.id, ev.id, provider=malformed_provider)
+        assert res.blockchain_verified is False
+        assert res.status == "malformed_calldata"
+
+        db.refresh(ev)
+        assert ev.blockchain_verified is False
+
+
+def test_20_tampered_evidence_data_after_anchor_fails_verification():
+    """20. Evidence modified after anchoring produces a mismatched proof hash during verification."""
+    with SessionLocal() as db:
+        case = _make_case(db)
+        ev = _make_evidence(db, case.id, blockchain_tx_id=SAMPLE_TX_ID)
+        db.commit()
+
+        # Compute original proof hash
+        original_proof = generate_canonical_evidence_proof(ev)
+
+        # Provider simulates on-chain record having original_proof.proof_sha256
+        def _verify_against_original(proof: CanonicalEvidenceProof, transaction_id: str | None = None) -> VerificationResult:
+            is_matching = (proof.proof_sha256 == original_proof.proof_sha256)
+            return VerificationResult(
+                transaction_id=transaction_id or SAMPLE_TX_ID,
+                proof_sha256=proof.proof_sha256,
+                verified=is_matching,
+                network=SAMPLE_NETWORK,
+                provider=SAMPLE_PROVIDER,
+                verified_at=datetime.now(timezone.utc),
+                status="verified" if is_matching else "mismatched",
+            )
+
+        tamper_provider = MagicMock(spec=BlockchainProvider)
+        tamper_provider.provider_name = SAMPLE_PROVIDER
+        tamper_provider.network_name = SAMPLE_NETWORK
+        tamper_provider.verify_evidence.side_effect = _verify_against_original
+
+        # Untampered: verify succeeds
+        res_ok = verify_evidence_on_blockchain(db, case.id, ev.id, provider=tamper_provider)
+        assert res_ok.blockchain_verified is True
+        assert res_ok.status == "verified"
+
+        # Tamper: change evidence_type
+        ev.evidence_type = "tampered_type"
+        db.commit()
+
+        # Re-verification must fail because canonical proof was regenerated from tampered row
+        res_fail = verify_evidence_on_blockchain(db, case.id, ev.id, provider=tamper_provider)
+        assert res_fail.blockchain_verified is False
+        assert res_fail.status == "mismatched"
+
+        db.refresh(ev)
+        assert ev.blockchain_verified is False
