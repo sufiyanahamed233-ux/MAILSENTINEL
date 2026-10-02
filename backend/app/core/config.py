@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-3.8-flash"
 
+    # Blockchain Settings (Phase 6C: Ethereum Sepolia)
+    BLOCKCHAIN_RPC_URL: str | None = None
+    BLOCKCHAIN_PRIVATE_KEY: str | None = None
+    BLOCKCHAIN_NETWORK: str = "sepolia"
+    BLOCKCHAIN_CHAIN_ID: int = 11155111
+    BLOCKCHAIN_ANCHOR_ADDRESS: str | None = None
+    BLOCKCHAIN_CONFIRMATIONS: int = 1
+
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

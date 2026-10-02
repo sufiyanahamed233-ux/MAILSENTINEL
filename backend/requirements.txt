@@ -9,6 +9,8 @@ extract-msg>=0.50.0
 python-multipart>=0.0.9
 httpx>=0.27.0
 google-genai>=1.0.0
+web3>=7.0.0
+
 
 
 

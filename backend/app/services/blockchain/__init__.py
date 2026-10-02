@@ -1,5 +1,6 @@
 """Blockchain services package for MAILSENTINEL."""
 
+from app.services.blockchain.ethereum import EthereumBlockchainProvider
 from app.services.blockchain.exceptions import (
     BlockchainAnchorError,
     BlockchainError,
@@ -32,6 +33,7 @@ __all__ = [
     "BlockchainTransactionNotFoundError",
     "BlockchainUnsupportedOperationError",
     "BlockchainVerificationError",
+    "EthereumBlockchainProvider",
     "InvalidProofPayloadError",
     "TransactionResult",
     "UnconfiguredBlockchainProvider",
@@ -39,3 +41,4 @@ __all__ = [
     "extract_proof_hash",
     "get_blockchain_provider",
 ]
+

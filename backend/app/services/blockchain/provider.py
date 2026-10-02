@@ -226,14 +226,31 @@ class UnconfiguredBlockchainProvider(BlockchainProvider):
 
 
 def get_blockchain_provider(provider_name: str | None = None) -> BlockchainProvider:
-    """Factory to retrieve a configured blockchain provider.
+    """Factory to retrieve a configured blockchain provider."""
+    from app.core.config import settings
 
-    Currently returns UnconfiguredBlockchainProvider until Phase 6C provider implementations
-    are registered.
-    """
-    if not provider_name or provider_name.strip().lower() in ("none", "unconfigured", "disabled"):
+    target_provider = provider_name
+    if not target_provider:
+        if settings.BLOCKCHAIN_RPC_URL:
+            target_provider = "ethereum"
+        else:
+            return UnconfiguredBlockchainProvider()
+
+    clean_name = target_provider.strip().lower()
+    if clean_name in ("none", "unconfigured", "disabled"):
         return UnconfiguredBlockchainProvider()
+
+    if clean_name in ("ethereum", "sepolia", "ethereum-sepolia", "eth"):
+        from app.services.blockchain.ethereum import EthereumBlockchainProvider
+
+        provider = EthereumBlockchainProvider()
+        if not provider.rpc_url:
+            raise BlockchainProviderNotConfiguredError(
+                f"Blockchain provider '{provider_name}' is not configured (missing BLOCKCHAIN_RPC_URL)."
+            )
+        return provider
 
     raise BlockchainProviderNotConfiguredError(
         f"Blockchain provider '{provider_name}' is not supported or not configured."
     )
+
