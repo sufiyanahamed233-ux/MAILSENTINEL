@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.db.session import get_db
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -35,3 +38,20 @@ def health_check() -> dict[str, str]:
         "app": settings.APP_NAME,
         "environment": settings.ENVIRONMENT,
     }
+
+
+@app.get("/health/db", tags=["Health"])
+def db_health_check(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Database connectivity health check verifying PostgreSQL connection without touching application tables."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "ok",
+            "database": "connected",
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connectivity check failed: {str(exc)}",
+        )
+
