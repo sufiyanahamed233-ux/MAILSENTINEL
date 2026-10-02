@@ -5,5 +5,8 @@ psycopg>=3.1.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
 python-dotenv>=1.0.0
+extract-msg>=0.50.0
+python-multipart>=0.0.9
+
 
 
