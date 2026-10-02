@@ -1,6 +1,6 @@
 import os
 import uuid
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -10,6 +10,7 @@ from app.schemas.email_analysis import (
     ParsedAttachment,
     ParsedURL,
 )
+from app.schemas.investigation import CaseListResponse, CaseWorkspaceResponse
 from app.services.ai.orchestrator import (
     CaseNotFoundServiceError,
     ProviderAuthError,
@@ -20,6 +21,11 @@ from app.services.ai.orchestrator import (
 )
 from app.services.forensic.parser import parse_email
 from app.services.forensic.persistence import persist_forensic_data
+from app.services.investigation import (
+    CaseNotFoundError,
+    get_case_workspace,
+    list_cases,
+)
 from app.services.threat_intel import CaseEnrichmentSummary, ThreatIntelService
 
 
@@ -218,3 +224,45 @@ def trigger_ai_analysis(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error during AI analysis: {str(exc)}",
         )
+
+
+@api_router.get(
+    "/cases/{case_id}",
+    response_model=CaseWorkspaceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get complete investigation case workspace",
+    tags=["Investigation"],
+)
+def get_case(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> CaseWorkspaceResponse:
+    """Retrieve the complete investigation workspace for a case.
+
+    Includes all associated emails and observed forensic artifacts,
+    external threat intelligence results, AI threat assessments,
+    chronological audit events, and computed summary metrics.
+    """
+    try:
+        return get_case_workspace(db=db, case_id=case_id)
+    except CaseNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+
+@api_router.get(
+    "/cases",
+    response_model=CaseListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List investigation cases (paginated)",
+    tags=["Investigation"],
+)
+def list_investigation_cases(
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of cases to return"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    db: Session = Depends(get_db),
+) -> CaseListResponse:
+    """Retrieve a paginated list of investigation cases, ordered newest first."""
+    return list_cases(db=db, limit=limit, offset=offset)
