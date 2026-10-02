@@ -17,6 +17,7 @@ from app.schemas.evidence import (
     EventListResponse,
     IndicatorListResponse,
 )
+from app.schemas.report import CaseReportResponse
 from app.services.ai.orchestrator import (
     CaseNotFoundServiceError,
     ProviderAuthError,
@@ -31,6 +32,7 @@ from app.services.investigation import (
     CaseNotFoundError,
     EmailNotBelongToCaseError,
     EmailNotFoundError,
+    generate_case_report,
     get_case_evidence,
     get_case_events,
     get_case_indicators,
@@ -385,3 +387,40 @@ def list_case_indicators(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         )
+
+
+@api_router.get(
+    "/cases/{case_id}/report",
+    response_model=CaseReportResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate a structured forensic report for an investigation case",
+    tags=["Reports"],
+)
+def get_case_report(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> CaseReportResponse:
+    """Generate a structured, deterministic forensic report for an investigation case.
+
+    Assembles existing persisted PostgreSQL data across 7 sections:
+    1. Case Information
+    2. Executive Summary
+    3. Emails and Forensic Artifacts
+    4. Threat Intelligence (external enrichments)
+    5. AI Findings
+    6. Evidence / Chain-of-Custody
+    7. Investigation Audit Events
+
+    Read-only: strictly excludes raw email bodies, HTML, raw MIME, attachment binaries,
+    TI raw_response, API keys, credentials, and secrets.
+    Does not call AI providers, threat intel APIs, or blockchain nodes.
+    Returns 404 if the case does not exist.
+    """
+    try:
+        return generate_case_report(db=db, case_id=case_id)
+    except CaseNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+

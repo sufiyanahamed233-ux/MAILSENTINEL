@@ -48,6 +48,15 @@ from app.schemas.evidence import (
     InvestigationEventItem as EvidenceEventItem,
     ThreatIndicatorItem,
 )
+from app.schemas.report import (
+    CaseInformation,
+    CaseInformationItem,
+    CaseReportResponse,
+    ExecutiveSummary,
+    ExecutiveSummaryItem,
+    ForensicReportResponse,
+    ReportEmailItem,
+)
 
 __all__ = [
     "AIAnalysisContext",
@@ -90,4 +99,11 @@ __all__ = [
     "EvidenceEventItem",
     "EventListResponse",
     "IndicatorListResponse",
+    "CaseInformation",
+    "CaseInformationItem",
+    "CaseReportResponse",
+    "ExecutiveSummary",
+    "ExecutiveSummaryItem",
+    "ForensicReportResponse",
+    "ReportEmailItem",
 ]

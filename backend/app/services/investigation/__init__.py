@@ -10,6 +10,7 @@ from app.services.investigation.evidence_service import (
     get_case_events,
     get_case_indicators,
 )
+from app.services.investigation.report_service import generate_case_report
 from app.services.investigation.service import (
     CaseNotFoundError,
     get_case_workspace,
@@ -25,5 +26,6 @@ __all__ = [
     "get_case_indicators",
     "get_case_workspace",
     "get_email_detail",
+    "generate_case_report",
     "list_cases",
 ]
