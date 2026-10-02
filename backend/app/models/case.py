@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.ai_analysis import AIAnalysisResult
     from app.models.email import Email
     from app.models.evidence import Evidence
     from app.models.indicator import ThreatIndicator
@@ -89,6 +90,11 @@ class Case(Base):
     )
     threat_intelligence_results: Mapped[list[ThreatIntelligenceResult]] = relationship(
         "ThreatIntelligenceResult",
+        back_populates="case",
+        cascade="all, delete-orphan",
+    )
+    ai_analysis_results: Mapped[list[AIAnalysisResult]] = relationship(
+        "AIAnalysisResult",
         back_populates="case",
         cascade="all, delete-orphan",
     )

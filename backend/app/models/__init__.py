@@ -1,5 +1,6 @@
 """Database ORM models package for MAILSENTINEL."""
 
+from app.models.ai_analysis import AIAnalysisResult
 from app.models.case import Case
 from app.models.email import Attachment, Email, EmailHeader
 from app.models.evidence import Evidence
@@ -9,6 +10,7 @@ from app.models.network import Domain, IPAddress, URL
 from app.models.threat_intel import ThreatIntelligenceResult
 
 __all__ = [
+    "AIAnalysisResult",
     "Case",
     "Email",
     "EmailHeader",
