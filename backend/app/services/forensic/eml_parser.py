@@ -60,7 +60,15 @@ def parse_date_header(date_str: str | None) -> datetime | None:
 
 def parse_eml_bytes(raw_bytes: bytes, filename: str) -> ParsedEmailData:
     """Parse raw bytes of an .eml email message into structured forensic data."""
+    # Hash the original bytes before any normalisation (forensically correct)
     raw_file_hash = calculate_sha256(raw_bytes)
+
+    # Strip UTF-8 BOM (\xef\xbb\xbf) emitted by Windows tools such as PowerShell
+    # Set-Content -Encoding UTF8.  RFC 5322 does not permit a BOM; its presence
+    # causes email.message_from_bytes to treat the entire file as a headerless
+    # body part, yielding zero parsed headers, sender, subject, or IPs.
+    if raw_bytes.startswith(b"\xef\xbb\xbf"):
+        raw_bytes = raw_bytes[3:]
 
     # Parse with default policy which handles basic RFC 2047 and modern email conventions
     msg = email.message_from_bytes(raw_bytes, policy=policy.default)
