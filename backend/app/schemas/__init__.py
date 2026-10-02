@@ -40,6 +40,14 @@ from app.schemas.investigation import (
     UrlItem,
 )
 from app.schemas.investigation_detail import EmailDetailResponse
+from app.schemas.evidence import (
+    EvidenceItem,
+    EvidenceListResponse,
+    EventListResponse,
+    IndicatorListResponse,
+    InvestigationEventItem as EvidenceEventItem,
+    ThreatIndicatorItem,
+)
 
 __all__ = [
     "AIAnalysisContext",
@@ -75,5 +83,11 @@ __all__ = [
     "ParsedIP",
     "ParsedURL",
     "ThreatIntelItem",
+    "ThreatIndicatorItem",
     "UrlItem",
+    "EvidenceItem",
+    "EvidenceListResponse",
+    "EvidenceEventItem",
+    "EventListResponse",
+    "IndicatorListResponse",
 ]

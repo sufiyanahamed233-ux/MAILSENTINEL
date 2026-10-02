@@ -12,6 +12,11 @@ from app.schemas.email_analysis import (
 )
 from app.schemas.investigation import CaseListResponse, CaseWorkspaceResponse
 from app.schemas.investigation_detail import EmailDetailResponse
+from app.schemas.evidence import (
+    EvidenceListResponse,
+    EventListResponse,
+    IndicatorListResponse,
+)
 from app.services.ai.orchestrator import (
     CaseNotFoundServiceError,
     ProviderAuthError,
@@ -26,6 +31,9 @@ from app.services.investigation import (
     CaseNotFoundError,
     EmailNotBelongToCaseError,
     EmailNotFoundError,
+    get_case_evidence,
+    get_case_events,
+    get_case_indicators,
     get_case_workspace,
     get_email_detail,
     list_cases,
@@ -288,6 +296,91 @@ def get_email_investigation_detail(
     try:
         return get_email_detail(db=db, case_id=case_id, email_id=email_id)
     except (CaseNotFoundError, EmailNotFoundError, EmailNotBelongToCaseError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+
+@api_router.get(
+    "/cases/{case_id}/evidence",
+    response_model=EvidenceListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List chain-of-custody evidence records for an investigation case",
+    tags=["Evidence & Audit"],
+)
+def list_case_evidence(
+    case_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of records to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    db: Session = Depends(get_db),
+) -> EvidenceListResponse:
+    """Return paginated forensic evidence records (chain-of-custody) for a case.
+
+    Ordered by collected_at ASC, then id ASC for deterministic pagination.
+    Returns 404 if the case does not exist.
+    """
+    try:
+        return get_case_evidence(db=db, case_id=case_id, limit=limit, offset=offset)
+    except CaseNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+
+@api_router.get(
+    "/cases/{case_id}/events",
+    response_model=EventListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List chronological audit-trail events for an investigation case",
+    tags=["Evidence & Audit"],
+)
+def list_case_events(
+    case_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of records to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    db: Session = Depends(get_db),
+) -> EventListResponse:
+    """Return paginated, sanitized investigation audit events for a case.
+
+    Event metadata is filtered to an allowlist of safe keys; credentials,
+    raw email content, and provider secrets are never returned.
+    Ordered by created_at ASC, then id ASC.
+    Returns 404 if the case does not exist.
+    """
+    try:
+        return get_case_events(db=db, case_id=case_id, limit=limit, offset=offset)
+    except CaseNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+
+@api_router.get(
+    "/cases/{case_id}/indicators",
+    response_model=IndicatorListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List normalized forensic threat indicators for an investigation case",
+    tags=["Evidence & Audit"],
+)
+def list_case_indicators(
+    case_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of records to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    db: Session = Depends(get_db),
+) -> IndicatorListResponse:
+    """Return paginated forensic threat indicators for a case.
+
+    Note: ThreatIndicator (internally derived forensic IoCs) is distinct from
+    ThreatIntelligenceResult (external enrichments from VirusTotal/AbuseIPDB).
+    Ordered by created_at ASC, then id ASC.
+    Returns 404 if the case does not exist.
+    """
+    try:
+        return get_case_indicators(db=db, case_id=case_id, limit=limit, offset=offset)
+    except CaseNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
