@@ -27,11 +27,27 @@ from app.services.ai.orchestrator import (
     run_ai_analysis,
 )
 from app.services.forensic.parser import parse_email
+from app.services.blockchain import (
+    BlockchainAnchorError,
+    BlockchainError,
+    BlockchainNetworkError,
+    BlockchainProviderNotConfiguredError,
+    BlockchainTransactionNotFoundError,
+    BlockchainVerificationError,
+    EvidenceAlreadyAnchoredError,
+    EvidenceBlockchainResponse,
+    EvidenceNotAnchoredError,
+    EvidenceNotBelongToCaseError,
+    InvalidProofPayloadError,
+    anchor_evidence_to_blockchain,
+    verify_evidence_on_blockchain,
+)
 from app.services.forensic.persistence import persist_forensic_data
 from app.services.investigation import (
     CaseNotFoundError,
     EmailNotBelongToCaseError,
     EmailNotFoundError,
+    EvidenceNotFoundError,
     generate_case_report,
     get_case_evidence,
     get_case_events,
@@ -421,6 +437,118 @@ def get_case_report(
     except CaseNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+
+@api_router.post(
+    "/cases/{case_id}/evidence/{evidence_id}/anchor",
+    response_model=EvidenceBlockchainResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Anchor canonical evidence proof to configured blockchain network",
+    tags=["Blockchain"],
+)
+def anchor_case_evidence(
+    case_id: uuid.UUID,
+    evidence_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> EvidenceBlockchainResponse:
+    """Anchor a persisted evidence record onto the configured blockchain network.
+
+    Generates canonical evidence proof, calls get_blockchain_provider(),
+    anchors proof hash on-chain, and persists transaction ID.
+    Returns 404 if case or evidence not found, or mismatch.
+    Returns 409 if evidence is already anchored.
+    """
+    try:
+        return anchor_evidence_to_blockchain(db=db, case_id=case_id, evidence_id=evidence_id)
+    except (CaseNotFoundError, EvidenceNotFoundError, EvidenceNotBelongToCaseError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except EvidenceAlreadyAnchoredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
+    except BlockchainProviderNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except (BlockchainNetworkError, BlockchainAnchorError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+    except InvalidProofPayloadError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+    except BlockchainError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        )
+
+
+@api_router.post(
+    "/cases/{case_id}/evidence/{evidence_id}/verify",
+    response_model=EvidenceBlockchainResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verify canonical evidence proof against on-chain anchor record",
+    tags=["Blockchain"],
+)
+def verify_case_evidence(
+    case_id: uuid.UUID,
+    evidence_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> EvidenceBlockchainResponse:
+    """Verify an anchored evidence record against on-chain records.
+
+    Regenerates the canonical evidence proof statement from the current database
+    record and compares it against the on-chain anchor data at blockchain_tx_id.
+    Updates Evidence.blockchain_verified safely.
+    Returns 404 if case or evidence not found, or mismatch.
+    Returns 400 if evidence has not been anchored yet (missing blockchain_tx_id).
+    """
+    try:
+        return verify_evidence_on_blockchain(db=db, case_id=case_id, evidence_id=evidence_id)
+    except (CaseNotFoundError, EvidenceNotFoundError, EvidenceNotBelongToCaseError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except EvidenceNotAnchoredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except BlockchainProviderNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except BlockchainTransactionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except (BlockchainNetworkError, BlockchainVerificationError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+    except InvalidProofPayloadError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+    except BlockchainError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         )
 

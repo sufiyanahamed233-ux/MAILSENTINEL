@@ -11,6 +11,14 @@ from app.services.blockchain.exceptions import (
     BlockchainVerificationError,
     InvalidProofPayloadError,
 )
+from app.services.blockchain.evidence_service import (
+    EvidenceAlreadyAnchoredError,
+    EvidenceBlockchainResponse,
+    EvidenceNotAnchoredError,
+    EvidenceNotBelongToCaseError,
+    anchor_evidence_to_blockchain,
+    verify_evidence_on_blockchain,
+)
 from app.services.blockchain.models import (
     AnchorResult,
     TransactionResult,
@@ -34,11 +42,17 @@ __all__ = [
     "BlockchainUnsupportedOperationError",
     "BlockchainVerificationError",
     "EthereumBlockchainProvider",
+    "EvidenceAlreadyAnchoredError",
+    "EvidenceBlockchainResponse",
+    "EvidenceNotAnchoredError",
+    "EvidenceNotBelongToCaseError",
     "InvalidProofPayloadError",
     "TransactionResult",
     "UnconfiguredBlockchainProvider",
     "VerificationResult",
+    "anchor_evidence_to_blockchain",
     "extract_proof_hash",
     "get_blockchain_provider",
+    "verify_evidence_on_blockchain",
 ]
 
