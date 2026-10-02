@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from app.models.evidence import Evidence
     from app.models.indicator import ThreatIndicator
     from app.models.investigation import InvestigationEvent
+    from app.models.threat_intel import ThreatIntelligenceResult
+
 
 
 class Case(Base):
@@ -85,3 +87,9 @@ class Case(Base):
         back_populates="case",
         cascade="all, delete-orphan",
     )
+    threat_intelligence_results: Mapped[list[ThreatIntelligenceResult]] = relationship(
+        "ThreatIntelligenceResult",
+        back_populates="case",
+        cascade="all, delete-orphan",
+    )
+

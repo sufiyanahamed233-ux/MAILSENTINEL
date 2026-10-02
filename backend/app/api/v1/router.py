@@ -11,6 +11,8 @@ from app.schemas.email_analysis import (
 )
 from app.services.forensic.parser import parse_email
 from app.services.forensic.persistence import persist_forensic_data
+from app.services.threat_intel import CaseEnrichmentSummary, ThreatIntelService
+
 
 api_router = APIRouter()
 
@@ -119,3 +121,35 @@ async def analyze_email(
             for att in parsed_data.attachments
         ],
     )
+
+
+@api_router.post(
+    "/cases/{case_id}/threat-intelligence",
+    response_model=CaseEnrichmentSummary,
+    status_code=status.HTTP_200_OK,
+    summary="Trigger threat intelligence enrichment for an existing investigation case",
+    tags=["Threat Intelligence"],
+)
+async def enrich_case_threat_intelligence(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> CaseEnrichmentSummary:
+    """Collect observed IoCs from an investigation case, query configured threat
+
+    intelligence providers (VirusTotal, AbuseIPDB) or DB cache, persist the results,
+    and return structured enrichment results.
+    """
+    service = ThreatIntelService()
+    try:
+        return await service.enrich_case(db=db, case_id=case_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error executing threat intelligence enrichment: {str(exc)}",
+        )
+

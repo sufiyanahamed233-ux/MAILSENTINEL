@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     DB_CONNECT_TIMEOUT: int = 5
     DB_ECHO: bool = False
 
+    # External Threat Intelligence Settings
+    VIRUSTOTAL_API_KEY: str | None = None
+    ABUSEIPDB_API_KEY: str | None = None
+    THREAT_INTEL_TIMEOUT_SECONDS: int = 10
+    THREAT_INTEL_CACHE_HOURS: int = 24
+
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_connection(cls, v: str) -> str:
