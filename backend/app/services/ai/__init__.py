@@ -11,9 +11,20 @@ from app.services.ai.exceptions import (
     AISchemaValidationError,
 )
 from app.services.ai.gemini import GeminiProvider
+from app.services.ai.orchestrator import (
+    AIAnalysisServiceError,
+    CaseNotFoundServiceError,
+    ProviderAuthError,
+    ProviderNotConfiguredError,
+    ProviderResponseError,
+    ProviderUnavailableError,
+    run_ai_analysis,
+    run_ai_analysis_async,
+)
 from app.services.ai.provider import AIProvider
 
 __all__ = [
+    "AIAnalysisServiceError",
     "AIAuthenticationError",
     "AIConfigurationError",
     "AINetworkError",
@@ -22,6 +33,13 @@ __all__ = [
     "AIRateLimitError",
     "AIResponseParsingError",
     "AISchemaValidationError",
+    "CaseNotFoundServiceError",
     "GeminiProvider",
+    "ProviderAuthError",
+    "ProviderNotConfiguredError",
+    "ProviderResponseError",
+    "ProviderUnavailableError",
     "build_ai_context",
+    "run_ai_analysis",
+    "run_ai_analysis_async",
 ]

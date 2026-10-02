@@ -271,3 +271,32 @@ class AIThreatAssessment(BaseModel):
         default_factory=list,
         description="Actionable remediation, containment, or follow-up recommendations for analysts.",
     )
+
+
+# ------------------------------------------------------------------
+# API response schema for persisted AIAnalysisResult
+# ------------------------------------------------------------------
+
+class AIAnalysisResultResponse(BaseModel):
+    """Response schema returned by POST /api/v1/cases/{case_id}/ai-analysis.
+
+    Maps the persisted AIAnalysisResult database row into a clean API response.
+    API keys, raw email content, and raw provider payloads are never included.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    case_id: UUID
+    classification: Literal["clean", "suspicious", "malicious", "unknown"]
+    risk_score: int | None = None
+    confidence: float | None = None
+    reasoning: str | None = None
+    threat_indicators: list[dict] | None = None
+    supporting_evidence: list[str] | None = None
+    attack_techniques: list[str] | None = None
+    recommended_actions: list[str] | None = None
+    model: str | None = None
+    provider: str | None = None
+    prompt_version: str | None = None
+    created_at: datetime

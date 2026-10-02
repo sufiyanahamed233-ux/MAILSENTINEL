@@ -4,10 +4,19 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.schemas.ai_analysis import AIAnalysisResultResponse
 from app.schemas.email_analysis import (
     EmailAnalysisResponse,
     ParsedAttachment,
     ParsedURL,
+)
+from app.services.ai.orchestrator import (
+    CaseNotFoundServiceError,
+    ProviderAuthError,
+    ProviderNotConfiguredError,
+    ProviderResponseError,
+    ProviderUnavailableError,
+    run_ai_analysis,
 )
 from app.services.forensic.parser import parse_email
 from app.services.forensic.persistence import persist_forensic_data
@@ -153,3 +162,59 @@ async def enrich_case_threat_intelligence(
             detail=f"Error executing threat intelligence enrichment: {str(exc)}",
         )
 
+
+@api_router.post(
+    "/cases/{case_id}/ai-analysis",
+    response_model=AIAnalysisResultResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Run AI threat analysis on an investigation case and persist the result",
+    tags=["AI Analysis"],
+)
+def trigger_ai_analysis(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> AIAnalysisResultResponse:
+    """Orchestrate AI threat analysis for an existing investigation case.
+
+    Steps performed:
+    1. Build deterministic forensic context from all evidence in the database.
+    2. Invoke the configured Gemini AI provider to produce a structured assessment.
+    3. Persist the validated AIThreatAssessment as a new AIAnalysisResult row.
+
+    Returns the freshly persisted analysis.  Raw email content, email bodies,
+    attachment binaries, and API keys are never included in the response.
+    """
+    try:
+        result = run_ai_analysis(db=db, case_id=case_id)
+        return AIAnalysisResultResponse.model_validate(result)
+
+    except CaseNotFoundServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except ProviderNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except ProviderAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except ProviderUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except ProviderResponseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error during AI analysis: {str(exc)}",
+        )

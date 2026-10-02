@@ -2,6 +2,7 @@
 
 from app.schemas.ai_analysis import (
     AIAnalysisContext,
+    AIAnalysisResultResponse,
     AIAttachmentEvidence,
     AICaseContext,
     AIDomainEvidence,
@@ -27,6 +28,7 @@ from app.schemas.email_analysis import (
 
 __all__ = [
     "AIAnalysisContext",
+    "AIAnalysisResultResponse",
     "AIAttachmentEvidence",
     "AICaseContext",
     "AIDomainEvidence",
