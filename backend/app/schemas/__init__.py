@@ -39,6 +39,7 @@ from app.schemas.investigation import (
     ThreatIntelItem,
     UrlItem,
 )
+from app.schemas.investigation_detail import EmailDetailResponse
 
 __all__ = [
     "AIAnalysisContext",
@@ -61,6 +62,7 @@ __all__ = [
     "CaseWorkspaceResponse",
     "DomainItem",
     "EmailAnalysisResponse",
+    "EmailDetailResponse",
     "EmailWorkspaceItem",
     "HeaderItem",
     "InvestigationEventItem",

@@ -11,6 +11,7 @@ from app.schemas.email_analysis import (
     ParsedURL,
 )
 from app.schemas.investigation import CaseListResponse, CaseWorkspaceResponse
+from app.schemas.investigation_detail import EmailDetailResponse
 from app.services.ai.orchestrator import (
     CaseNotFoundServiceError,
     ProviderAuthError,
@@ -23,7 +24,10 @@ from app.services.forensic.parser import parse_email
 from app.services.forensic.persistence import persist_forensic_data
 from app.services.investigation import (
     CaseNotFoundError,
+    EmailNotBelongToCaseError,
+    EmailNotFoundError,
     get_case_workspace,
+    get_email_detail,
     list_cases,
 )
 from app.services.threat_intel import CaseEnrichmentSummary, ThreatIntelService
@@ -266,3 +270,25 @@ def list_investigation_cases(
 ) -> CaseListResponse:
     """Retrieve a paginated list of investigation cases, ordered newest first."""
     return list_cases(db=db, limit=limit, offset=offset)
+
+
+@api_router.get(
+    "/cases/{case_id}/emails/{email_id}",
+    response_model=EmailDetailResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get detailed investigation evidence for a specific email",
+    tags=["Investigation"],
+)
+def get_email_investigation_detail(
+    case_id: uuid.UUID,
+    email_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> EmailDetailResponse:
+    """Retrieve detailed forensic artifacts, threat intelligence, and AI analysis for an email."""
+    try:
+        return get_email_detail(db=db, case_id=case_id, email_id=email_id)
+    except (CaseNotFoundError, EmailNotFoundError, EmailNotBelongToCaseError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
