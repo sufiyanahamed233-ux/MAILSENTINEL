@@ -1,0 +1,25 @@
+﻿From: alice.investigator@mailsentinel.test
+To: bob.analyst@mailsentinel.test
+Subject: Phase 6F E2E Test -- MAILSENTINEL Evidence Anchor
+Date: Sat, 04 Oct 2026 07:00:00 +0000
+Message-ID: <phase6f-e2e-fixture-001@mailsentinel.test>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Received: from smtp.mailsentinel.test (smtp.mailsentinel.test [203.0.113.42])
+        by mail.mailsentinel.test with ESMTP id abc123;
+        Sat, 04 Oct 2026 07:00:00 +0000
+
+This is a controlled forensic evidence fixture for the MAILSENTINEL
+Phase 6F real Ethereum Sepolia E2E integration test.
+
+The SHA-256 of the raw bytes of this .eml file is used as Evidence.sha256.
+A canonical evidence proof is generated from that hash and anchored on
+the Ethereum Sepolia testnet. No email body content or raw MIME bytes are
+stored on-chain -- only the 32-byte proof_sha256 calldata.
+
+Fixture metadata:
+  Phase: 6F -- Real Evidence -> Sepolia E2E
+  Evidence type: email_rfc822
+  Collected by: mailsentinel_phase6f_runner
+
