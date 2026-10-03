@@ -293,11 +293,13 @@ def test_07_unconfigured_provider_behavior():
         provider.get_transaction(VALID_TX_ID)
     assert "not configured" in str(exc_get.value).lower()
 
-    # Factory tests
-    assert isinstance(get_blockchain_provider(None), UnconfiguredBlockchainProvider)
-    assert isinstance(get_blockchain_provider("unconfigured"), UnconfiguredBlockchainProvider)
-    with pytest.raises(BlockchainProviderNotConfiguredError):
-        get_blockchain_provider("ethereum-sepolia")
+    # Factory tests — isolate from real .env values so these are deterministic
+    # regardless of whether BLOCKCHAIN_RPC_URL is set on the developer machine.
+    with patch("app.core.config.settings.BLOCKCHAIN_RPC_URL", None):
+        assert isinstance(get_blockchain_provider(None), UnconfiguredBlockchainProvider)
+        assert isinstance(get_blockchain_provider("unconfigured"), UnconfiguredBlockchainProvider)
+        with pytest.raises(BlockchainProviderNotConfiguredError):
+            get_blockchain_provider("ethereum-sepolia")
 
 
 # ===========================================================================

@@ -264,23 +264,29 @@ def test_05_unconfigured_provider_behavior():
     """5. Unconfigured provider instance raises domain exceptions without network calls."""
     proof = _make_sample_proof()
 
-    # Empty provider with no RPC or keys
-    provider = EthereumBlockchainProvider(rpc_url=None, private_key=None, anchor_address=None)
+    # Isolate from the real .env so that EthereumBlockchainProvider(rpc_url=None, ...)
+    # cannot fall back to BLOCKCHAIN_RPC_URL / BLOCKCHAIN_PRIVATE_KEY from settings.
+    with (
+        patch("app.core.config.settings.BLOCKCHAIN_RPC_URL", None),
+        patch("app.core.config.settings.BLOCKCHAIN_PRIVATE_KEY", None),
+        patch("app.core.config.settings.BLOCKCHAIN_ANCHOR_ADDRESS", None),
+    ):
+        # Empty provider with no RPC or keys
+        provider = EthereumBlockchainProvider(rpc_url=None, private_key=None, anchor_address=None)
 
-    with pytest.raises(BlockchainProviderNotConfiguredError) as exc_anchor:
-        provider.anchor_evidence(proof)
-    assert "not configured" in str(exc_anchor.value).lower()
+        with pytest.raises(BlockchainProviderNotConfiguredError) as exc_anchor:
+            provider.anchor_evidence(proof)
+        assert "not configured" in str(exc_anchor.value).lower()
 
-    with pytest.raises(BlockchainProviderNotConfiguredError) as exc_tx:
-        provider.get_transaction(SAMPLE_TX_HASH)
-    assert "not configured" in str(exc_tx.value).lower()
+        with pytest.raises(BlockchainProviderNotConfiguredError) as exc_tx:
+            provider.get_transaction(SAMPLE_TX_HASH)
+        assert "not configured" in str(exc_tx.value).lower()
 
-    with pytest.raises(BlockchainProviderNotConfiguredError) as exc_ver:
-        provider.verify_evidence(proof, transaction_id=SAMPLE_TX_HASH)
-    assert "not configured" in str(exc_ver.value).lower()
+        with pytest.raises(BlockchainProviderNotConfiguredError) as exc_ver:
+            provider.verify_evidence(proof, transaction_id=SAMPLE_TX_HASH)
+        assert "not configured" in str(exc_ver.value).lower()
 
-    # Factory when unconfigured in settings returns UnconfiguredBlockchainProvider
-    with patch("app.core.config.settings.BLOCKCHAIN_RPC_URL", None):
+        # Factory when unconfigured in settings returns UnconfiguredBlockchainProvider
         assert isinstance(get_blockchain_provider(None), UnconfiguredBlockchainProvider)
         with pytest.raises(BlockchainProviderNotConfiguredError):
             get_blockchain_provider("ethereum-sepolia")
